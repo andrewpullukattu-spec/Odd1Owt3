@@ -154,18 +154,52 @@
 
   /* =========================
      QUESTIONS (edit freely)
-     Keep them safe for parties.
      ========================= */
   const questions = [
-    { normal: "Who is most likely to be late?", odd: "Who is most likely to set 12 alarms and still miss it?" },
-    { normal: "Who is the biggest yapper?", odd: "Who would narrate their own life out loud?" },
-    { normal: "Who is most likely to become famous?", odd: "Who would get famous for the most random thing?" },
-    { normal: "Who is the messiest?", odd: "Who would lose something while holding it?" },
-    { normal: "Who is the most competitive?", odd: "Who would turn Uno into a legal case?" }
+    { normal: 'Who is most likely to be pregnant?', odd: 'Who is most liekly to forget their kid at the park' },
+    { normal: 'Who is the most autistic?', odd: 'Who is the most likely to get stuck in revolving doors?' },
+    { normal: 'Who is most likely to crash their car?', odd: 'Who is the messiest?' },
+    { normal: 'Who is most independant?', odd: 'Who is most likely to be sports captain?' },
+    { normal: 'Who is the loudest?', odd: 'Who is the meanest?' },
+    { normal: 'Who is the biggest gossip?', odd: 'Who is most likely to burn a cookie?' },
+    { normal: 'Who is the biggest yapper?', odd: 'Who is always on DND' },
+    { normal: 'Who has the best fashion?', odd: 'Who is the biggest money saver?' },
+    { normal: 'Who is short-tempered?', odd: 'Who is composed?' },
+    { normal: 'Who is most likely to murder someone?', odd: 'Who is most likely to haunt us after they die ?' },
+    { normal: 'Who is most likely to have 10 kids?', odd: 'Who is most likely to become an influencer?' },
+    { normal: 'Who is most likely to read 50 books in a year?', odd: 'Who is most likely to watch a movie and pretend they read the book?' },
+    { normal: 'Who is most likely to own 10 cats?', odd: 'Who is the most likely to swing the other direction?' },
+    { normal: 'Who is the most childish', odd: 'Who is most likely to have cereal with water?' },
+    { normal: 'Who is the most responsible?', odd: 'Who is msot liekly to cross the road without looking?' },
+    { normal: 'Who is most likely to elope?', odd: 'Who is most likely to do heroine?' },
+    { normal: 'Who is the zesiest?', odd: 'Who is the most brainrotted?' },
+    { normal: 'Who is girlypop?', odd: 'Who is least likely to live in a house full of girls?' },
+    { normal: 'Who is the most manly?', odd: 'Who wouldnt kill a spider?' },
+    { normal: 'Who is most likely to go to jail?', odd: 'Who would be the best lawyer?' },
+    { normal: 'Who is most likely to become a priest?', odd: 'Who is the first perosn to get drunk at a party?' },
+    { normal: 'Who is most likely to go on love island?', odd: 'Who is most likely to do heroin?' },
+    { normal: 'Who is most likely to injure themself?', odd: 'Who most likely to be referred to as unc or aunt?' },
+    { normal: 'Who is most likely to get drunk off lemon juice?', odd: 'Who is most likely to drop a 67 out of nowhere? SIXXXSEEVENNN ' },
+    { normal: 'Who smells the best?', odd: 'Who is most likely to wear a dress ?' },
+    { normal: 'Who is the most racist?', odd: 'Who looks best in a saree ?' },
+    { normal: 'Who is most likely to get cancelled?', odd: 'Who is the least controversial?' },
+    { normal: 'Who is the most innocent?', odd: 'Who is the biggest demon?' },
+    { normal: 'Who is the kindest?', odd: 'Who is msot likely to talk to a homeless man?' },
+    { normal: 'Who is the most mature?', odd: 'Who would forget their own phone number?' },
+    { normal: 'Who is the most nonchalant?', odd: 'Who is the most bait?' },
+    { normal: 'Who is the smartest?', odd: 'Who is most likely to wear odd socks?' },
+    { normal: 'Who is the funniest?', odd: 'Who would survive against a gorilla?' },
+    { normal: 'Who is most likely to get hit on the head with a ball?', odd: 'Who is thick in the head?' },
+    { normal: 'Who is most likely to accidentally leave their kid in the park?', odd: 'Who would be the strictest parent?' },
+    { normal: 'Who is the pickiest eater?', odd: 'Who is the most adventurous?' },
+    { normal: 'Who is most likely to lose all their money gambling?', odd: 'Who would be a smart investor?' },
+    { normal: 'Who is most likely to get hit by a car?', odd: 'Who is most likely to not know how to ride a bike?' },
+    { normal: 'Who is msot likely to be a high school teacher?', odd: 'Who is most likely to get sent to headmaster office as an adult?' },
+    { normal: 'Who is the oldest, like ancient, old as hell, pretty much a fossil at this point, like they got bills to pay why they here playing games?', odd: 'Who eats the most oranges' }   
   ];
 
   /* =========================
-     PLAYER (stable across reload)
+     PLAYER
      ========================= */
   const playerId = localStorage.getItem("odd1owt_pid") || crypto.randomUUID();
   localStorage.setItem("odd1owt_pid", playerId);
@@ -309,14 +343,13 @@
 
   /* =========================
      Voting (Phase 1 & 3)
+     Self-voting ENABLED
      ========================= */
   async function castP1Vote(targetId) {
     const snap = await getDoc(roomRef());
     if (!snap.exists()) return;
     const state = snap.data();
     if (state.phase !== "p1_vote") return;
-
-    if (targetId === playerId) return alert("You can't vote yourself.");
 
     await updateDoc(roomRef(), {
       [`p1Votes.${playerId}`]: targetId
@@ -328,8 +361,6 @@
     if (!snap.exists()) return;
     const state = snap.data();
     if (state.phase !== "p3_finalvote") return;
-
-    if (targetId === playerId) return alert("You can't vote yourself.");
 
     await updateDoc(roomRef(), {
       [`p3Votes.${playerId}`]: targetId
@@ -460,9 +491,6 @@
     const players = Object.values(state.players || {});
     document.getElementById("playersBox").innerText =
       `Code: ${roomId}\n\nPlayers:\n` + players.join(", ");
-
-    // host-only start button text / behavior
-    // (button exists for everyone; host check is in code)
   }
 
   function renderScores(state) {
@@ -477,7 +505,6 @@
 
     box.innerHTML = `<b>Scoreboard</b><div style="margin-top:8px">${rows || "<span class='small'>No scores yet.</span>"}</div>`;
 
-    // also show score in p4
     const p4Score = document.getElementById("p4Score");
     if (p4Score) p4Score.innerHTML = box.innerHTML;
   }
@@ -490,16 +517,15 @@
     document.getElementById("p1Question").innerHTML =
       `<b>Your Prompt:</b><br>${escapeHtml(myQ || "…")}`;
 
-    // vote list
+    // vote list (SELF INCLUDED)
     const list = document.getElementById("p1VoteList");
     list.innerHTML = "";
     const players = state.players || {};
     const myVote = state.p1Votes?.[playerId];
 
     Object.entries(players).forEach(([pid, name]) => {
-      if (pid === playerId) return;
       const b = document.createElement("button");
-      b.textContent = name;
+      b.textContent = pid === playerId ? `${name} (You)` : name;
       b.className = (myVote === pid) ? "selected" : "";
       b.onclick = () => castP1Vote(pid);
       list.appendChild(b);
@@ -549,10 +575,10 @@
     const players = state.players || {};
     const myVote = state.p3Votes?.[playerId];
 
+    // final vote list (SELF INCLUDED)
     Object.entries(players).forEach(([pid, name]) => {
-      if (pid === playerId) return;
       const b = document.createElement("button");
-      b.textContent = name;
+      b.textContent = pid === playerId ? `${name} (You)` : name;
       b.className = (myVote === pid) ? "selected" : "";
       b.onclick = () => castP3Vote(pid);
       list.appendChild(b);
@@ -567,12 +593,10 @@
     const players = state.players || {};
     const res = state.results;
 
-    // host-only next round button note
     document.getElementById("nextRoundBtn").style.display = (state.hostId === playerId) ? "block" : "none";
     document.getElementById("p4HostNote").textContent =
       (state.hostId === playerId) ? "Start the next round when you're ready." : "Waiting for host to start next round…";
 
-    // run reveal animation once per render
     if (localRevealTimeout) clearTimeout(localRevealTimeout);
 
     document.getElementById("p4Title").textContent = "Counting votes...";
@@ -583,7 +607,6 @@
       const oddName = players[res.oddId] || "Unknown";
       const verdict = res.caught ? `<span class="win">CAUGHT!</span>` : `<span class="lose">ESCAPED!</span>`;
 
-      // tally lines
       const tallyLines = Object.entries(res.tally || {})
         .sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]))
         .map(([pid, n]) => `• ${escapeHtml(players[pid] || "Unknown")}: <b>${n}</b>`)
@@ -626,3 +649,4 @@
 </script>
 </body>
 </html>
+
