@@ -6,217 +6,623 @@
 <title>Odd1Owt</title>
 
 <style>
-body {
-  background:#0b0b0e;
-  color:white;
-  font-family:system-ui, sans-serif;
-  display:flex;
-  justify-content:center;
-  padding:20px;
-}
-.shell {
-  max-width:420px;
-  width:100%;
-  background:#111114;
-  border-radius:16px;
-  padding:20px;
-}
-h1 { text-align:center; }
-button, input {
-  width:100%;
-  padding:14px;
-  margin-top:10px;
-  border-radius:10px;
-  border:none;
-  font-size:16px;
-}
-button { font-weight:600; cursor:pointer; }
-.red { background:#ef4444; color:white; }
-.white { background:white; color:black; }
-.bubble {
-  background:#1c1c21;
-  padding:16px;
-  border-radius:12px;
-  margin:15px 0;
-}
+  :root{
+    --bg:#0b0b0e; --card:#111114; --panel:#1c1c21; --text:#e5e5e5;
+    --red:#ef4444; --green:#22c55e; --gold:#ffb703; --muted:#9ca3af;
+    --border:rgba(255,255,255,0.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;display:flex;justify-content:center;padding:20px}
+  .shell{width:100%;max-width:460px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px}
+  .logo{font-weight:900;font-size:34px;text-align:center;margin:4px 0 18px}
+  .logo span{color:var(--red)}
+  .bubble{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin:14px 0;line-height:1.35}
+  input,button{width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);font-size:16px}
+  input{background:var(--panel);color:var(--text)}
+  button{cursor:pointer;font-weight:700}
+  .btn-red{background:var(--red);border-color:transparent;color:white}
+  .btn-white{background:white;border-color:transparent;color:black}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .row{display:flex;gap:10px}
+  .row > *{flex:1}
+  .small{font-size:12px;color:var(--muted)}
+  .tag{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:800}
+  .list button{margin-top:10px;background:var(--panel);color:var(--text);border:1px solid var(--border);text-align:left}
+  .list button.selected{outline:2px solid var(--green)}
+  .scoreRow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+  .scoreVal{color:var(--gold);font-weight:900}
+  .timer{font-size:52px;font-weight:950;text-align:center;color:var(--red);margin:10px 0}
+  .center{text-align:center}
+
+  /* Phase 4 animation */
+  .revealWrap{margin-top:10px}
+  .revealBox{
+    background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:18px;
+    overflow:hidden;
+    position:relative;
+  }
+  .sweep{
+    position:absolute; inset:-60px -60px auto -60px;
+    height:120px; transform:rotate(-8deg);
+    background:linear-gradient(90deg, transparent, rgba(255,183,3,0.22), transparent);
+    animation:sweep 1.6s ease-in-out infinite;
+  }
+  @keyframes sweep{0%{transform:translateX(-60%) rotate(-8deg)}100%{transform:translateX(60%) rotate(-8deg)}}
+  .big{font-size:26px;font-weight:950}
+  .win{color:var(--green);font-weight:950}
+  .lose{color:var(--red);font-weight:950}
 </style>
 </head>
 
 <body>
 <div class="shell">
-<h1>Odd1Owt</h1>
+  <div class="logo">Odd1<span>Owt</span></div>
 
-<section id="home">
-  <input id="nameInput" placeholder="Your name" />
-  <button class="red" onclick="createRoom()">Create Lobby</button>
-  <button class="white" onclick="show('join')">Join Lobby</button>
-</section>
+  <!-- HOME -->
+  <section id="home">
+    <input id="nameInput" placeholder="Your name" />
+    <div class="row">
+      <button class="btn-red" onclick="createRoom()">Create Lobby</button>
+      <button class="btn-white" onclick="show('join')">Join Lobby</button>
+    </div>
+    <div class="small" style="margin-top:10px">Tip: your name saves automatically.</div>
+  </section>
 
-<section id="join" style="display:none">
-  <input id="codeInput" placeholder="Lobby code" />
-  <button class="red" onclick="joinRoom()">Join</button>
-</section>
+  <!-- JOIN -->
+  <section id="join" style="display:none">
+    <input id="codeInput" placeholder="Lobby code (e.g. A1B2C3)" />
+    <button class="btn-red" onclick="joinRoom()">Join</button>
+    <button class="btn-ghost" style="margin-top:10px" onclick="show('home')">Back</button>
+  </section>
 
-<section id="lobby" style="display:none">
-  <div class="bubble" id="playersBox">Waiting for players...</div>
-  <button class="white" onclick="copyLink()">Copy Invite Link</button>
-  <button class="red" onclick="startGame()">Start Game</button>
-</section>
+  <!-- LOBBY -->
+  <section id="lobby" style="display:none">
+    <div class="tag">Lobby</div>
+    <div class="bubble" id="playersBox">Waiting for players...</div>
+    <div class="bubble" id="scoreBox"></div>
+    <button class="btn-white" onclick="copyInvite()">Copy Invite Link</button>
+    <button class="btn-red" style="margin-top:10px" onclick="hostStartRound()">Start Round</button>
+    <div class="small center" id="hostHint" style="margin-top:10px"></div>
+  </section>
 
-<section id="game" style="display:none">
-  <div class="bubble" id="questionBox"></div>
-</section>
+  <!-- PHASE 1 -->
+  <section id="p1" style="display:none">
+    <div class="tag">Phase 1 — Prompt + Vote</div>
+    <div class="bubble" id="p1Question"></div>
+    <div class="small">Vote who fits the question best (everyone votes).</div>
+    <div class="list" id="p1VoteList"></div>
+    <div class="small center" id="p1Status"></div>
+  </section>
 
+  <!-- PHASE 2 -->
+  <section id="p2" style="display:none">
+    <div class="tag">Phase 2 — Interrogation</div>
+    <div class="bubble"><b>Normal Question:</b><br><span id="p2NormalQ"></span></div>
+    <div class="timer" id="p2Timer">05:00</div>
+    <div class="bubble" id="p2WhoVoted"></div>
+    <button class="btn-white" id="skipBtn" style="display:none" onclick="hostSkipToFinal()">Skip to Final Vote</button>
+    <div class="small center" id="p2Status"></div>
+  </section>
+
+  <!-- PHASE 3 -->
+  <section id="p3" style="display:none">
+    <div class="tag">Phase 3 — Final Vote</div>
+    <div class="bubble"><b>Vote out the Odd1Owt</b></div>
+    <div class="list" id="p3VoteList"></div>
+    <div class="small center" id="p3Status"></div>
+  </section>
+
+  <!-- PHASE 4 -->
+  <section id="p4" style="display:none">
+    <div class="tag">Phase 4 — Reveal</div>
+    <div class="revealWrap">
+      <div class="revealBox">
+        <div class="sweep"></div>
+        <div class="center big" id="p4Title">Revealing...</div>
+        <div class="bubble" id="p4Details" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="bubble" id="p4Score"></div>
+    <button class="btn-red" id="nextRoundBtn" onclick="hostStartRound()">Next Round</button>
+    <div class="small center" id="p4HostNote" style="margin-top:10px"></div>
+  </section>
 </div>
 
-<!-- 🔥 FIREBASE SDK (SCRIPT TAG – NO NPM) -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  updateDoc,
-  onSnapshot,
-  getDoc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import {
+    getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* =====================
-   FIREBASE CONFIG
-===================== */
-const firebaseConfig = {
-  apiKey: "AIzaSyCaJ-2d3r_qKcSs4aCdhvzZtjAImnZ8YM",
-  authDomain: "odd1owt-ed87d.firebaseapp.com",
-  projectId: "odd1owt-ed87d",
-  storageBucket: "odd1owt-ed87d.appspot.com",
-  messagingSenderId: "615629953512",
-  appId: "1:615629953512:web:046f611961e7c1e556ec5d"
-};
+  /* =========================
+     🔥 FIREBASE CONFIG
+     ========================= */
+  const firebaseConfig = {
+    apiKey: "AIzaSyCaJ-2d3r_qKcSs4aCdhvzZtjAImnZ8YM",
+    authDomain: "odd1owt-ed87d.firebaseapp.com",
+    projectId: "odd1owt-ed87d",
+    storageBucket: "odd1owt-ed87d.appspot.com",
+    messagingSenderId: "615629953512",
+    appId: "1:615629953512:web:046f611961e7c1e556ec5d"
+  };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-console.log("🔥 Firebase connected");
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-/* =====================
-   GAME STATE
-===================== */
-let roomId = null;
-let unsubscribe = null;
+  /* =========================
+     QUESTIONS (edit freely)
+     Keep them safe for parties.
+     ========================= */
+  const questions = [
+    { normal: "Who is most likely to be late?", odd: "Who is most likely to set 12 alarms and still miss it?" },
+    { normal: "Who is the biggest yapper?", odd: "Who would narrate their own life out loud?" },
+    { normal: "Who is most likely to become famous?", odd: "Who would get famous for the most random thing?" },
+    { normal: "Who is the messiest?", odd: "Who would lose something while holding it?" },
+    { normal: "Who is the most competitive?", odd: "Who would turn Uno into a legal case?" }
+  ];
 
-const playerId =
-  localStorage.getItem("odd1owt_playerId") ||
-  crypto.randomUUID();
+  /* =========================
+     PLAYER (stable across reload)
+     ========================= */
+  const playerId = localStorage.getItem("odd1owt_pid") || crypto.randomUUID();
+  localStorage.setItem("odd1owt_pid", playerId);
 
-localStorage.setItem("odd1owt_playerId", playerId);
+  function getName() {
+    const typed = document.getElementById("nameInput").value.trim();
+    if (typed) localStorage.setItem("odd1owt_name", typed);
+    return localStorage.getItem("odd1owt_name");
+  }
 
-const questions = [
-  { normal: "Who is the loudest?", odd: "Who whispers aggressively?" },
-  { normal: "Who is the messiest?", odd: "Who cleans at 3am?" },
-  { normal: "Who is always late?", odd: "Who arrives an hour early?" }
-];
+  /* =========================
+     UI helpers
+     ========================= */
+  function show(id) {
+    document.querySelectorAll("section").forEach(s => s.style.display = "none");
+    document.getElementById(id).style.display = "block";
+  }
+  window.show = show;
 
-/* =====================
-   HELPERS
-===================== */
-function show(id) {
-  document.querySelectorAll("section").forEach(s => s.style.display = "none");
-  document.getElementById(id).style.display = "block";
-}
+  function randomCode() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
 
-function randomCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
+  function fmtTime(ms) {
+    const t = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(t / 60);
+    const s = t % 60;
+    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
 
-/* =====================
-   CREATE / JOIN
-===================== */
-window.createRoom = async function () {
-  roomId = randomCode();
-  await joinRoom(roomId, true);
-};
+  /* =========================
+     Room state
+     ========================= */
+  let roomId = null;
+  let unsub = null;
+  let timerInterval = null;
+  let localRevealTimeout = null;
 
-window.joinRoom = async function (codeOverride = null, isHost = false) {
-  roomId = codeOverride || document.getElementById("codeInput").value.trim().toUpperCase();
-  const name = document.getElementById("nameInput").value || "Player";
+  function roomRef() {
+    return doc(db, "rooms", roomId);
+  }
 
-  const ref = doc(db, "rooms", roomId);
+  /* =========================
+     Create / Join
+     ========================= */
+  window.createRoom = async function() {
+    const name = getName();
+    if (!name) return alert("Enter your name first.");
 
-  await setDoc(ref, {
-    players: { [playerId]: name },
-    hostId: isHost ? playerId : null,
-    phase: "lobby",
-    question: null,
-    odd: null
-  }, { merge: true });
+    roomId = randomCode();
+    await joinRoomInternal(true);
+  };
 
-  listenRoom();
-  show("lobby");
-};
+  window.joinRoom = async function() {
+    const name = getName();
+    if (!name) return alert("Enter your name first.");
 
-/* =====================
-   REALTIME LISTENER
-===================== */
-function listenRoom() {
-  if (unsubscribe) unsubscribe();
+    roomId = document.getElementById("codeInput").value.trim().toUpperCase();
+    if (!roomId) return alert("Enter a lobby code.");
 
-  const ref = doc(db, "rooms", roomId);
-  unsubscribe = onSnapshot(ref, snap => {
-    if (!snap.exists()) return;
-    const data = snap.data();
+    await joinRoomInternal(false);
+  };
 
-    document.getElementById("playersBox").innerText =
-      "Players:\n" + Object.values(data.players).join(", ");
+  async function joinRoomInternal(isHost) {
+    const name = getName();
 
-    if (data.phase === "game") {
-      show("game");
-      document.getElementById("questionBox").innerText =
-        playerId === data.odd
-          ? data.question.odd
-          : data.question.normal;
+    const ref = roomRef();
+    const snap = await getDoc(ref);
+    const data = snap.exists() ? snap.data() : null;
+
+    // prevent duplicate names
+    if (data?.players) {
+      const taken = Object.entries(data.players).some(([pid, pname]) => pid !== playerId && (pname || "").toLowerCase() === name.toLowerCase());
+      if (taken) return alert("That name is already taken in this lobby.");
     }
-  });
-}
 
-/* =====================
-   START GAME
-===================== */
-window.startGame = async function () {
-  const ref = doc(db, "rooms", roomId);
-  const snap = await getDoc(ref);
-  const data = snap.data();
+    const newHost = isHost ? playerId : (data?.hostId || null);
 
-  if (data.hostId !== playerId) return;
+    await setDoc(ref, {
+      createdAt: data?.createdAt || Date.now(),
+      hostId: newHost,
+      phase: data?.phase || "lobby",
+      round: data?.round || 0,
+      players: { ...(data?.players || {}), [playerId]: name },
+      scores: { ...(data?.scores || {}), [playerId]: data?.scores?.[playerId] ?? 0 }
+    }, { merge: true });
 
-  const ids = Object.keys(data.players);
-  const odd = ids[Math.floor(Math.random() * ids.length)];
-  const q = questions[Math.floor(Math.random() * questions.length)];
+    listenRoom();
+    show("lobby");
+  }
 
-  await updateDoc(ref, {
-    phase: "game",
-    odd,
-    question: q
-  });
-};
+  function listenRoom() {
+    if (unsub) unsub();
+    unsub = onSnapshot(roomRef(), snap => {
+      if (!snap.exists()) return;
 
-/* =====================
-   UTIL
-===================== */
-window.copyLink = function () {
-  navigator.clipboard.writeText(
-    location.origin + location.pathname + "?room=" + roomId
-  );
-  alert("Invite link copied");
-};
+      const state = snap.data();
+      render(state);
 
-/* =====================
-   AUTO-JOIN FROM LINK
-===================== */
-const params = new URLSearchParams(location.search);
-if (params.get("room")) {
-  document.getElementById("codeInput").value = params.get("room");
-  show("join");
-}
+      // host auto-advances phases
+      tryHostAdvance(state);
+    });
+  }
+
+  /* =========================
+     Host controls
+     ========================= */
+  window.hostStartRound = async function() {
+    const snap = await getDoc(roomRef());
+    if (!snap.exists()) return;
+    const state = snap.data();
+    if (state.hostId !== playerId) return alert("Only the host can start.");
+
+    const ids = Object.keys(state.players || {});
+    if (ids.length < 3) return alert("Need at least 3 players.");
+
+    const oddId = ids[Math.floor(Math.random() * ids.length)];
+    const q = questions[Math.floor(Math.random() * questions.length)];
+
+    await updateDoc(roomRef(), {
+      phase: "p1_vote",
+      round: (state.round || 0) + 1,
+      oddId,
+      question: q,
+      p1Votes: {},
+      p3Votes: {},
+      p2EndsAt: null,
+      results: null
+    });
+  };
+
+  window.hostSkipToFinal = async function() {
+    const snap = await getDoc(roomRef());
+    if (!snap.exists()) return;
+    const state = snap.data();
+    if (state.hostId !== playerId) return;
+    if (state.phase !== "p2_interrogate") return;
+
+    await updateDoc(roomRef(), { phase: "p3_finalvote" });
+  };
+
+  /* =========================
+     Voting (Phase 1 & 3)
+     ========================= */
+  async function castP1Vote(targetId) {
+    const snap = await getDoc(roomRef());
+    if (!snap.exists()) return;
+    const state = snap.data();
+    if (state.phase !== "p1_vote") return;
+
+    if (targetId === playerId) return alert("You can't vote yourself.");
+
+    await updateDoc(roomRef(), {
+      [`p1Votes.${playerId}`]: targetId
+    });
+  }
+
+  async function castP3Vote(targetId) {
+    const snap = await getDoc(roomRef());
+    if (!snap.exists()) return;
+    const state = snap.data();
+    if (state.phase !== "p3_finalvote") return;
+
+    if (targetId === playerId) return alert("You can't vote yourself.");
+
+    await updateDoc(roomRef(), {
+      [`p3Votes.${playerId}`]: targetId
+    });
+  }
+
+  /* =========================
+     Host auto-advance logic
+     ========================= */
+  async function tryHostAdvance(state) {
+    if (state.hostId !== playerId) return;
+
+    const players = state.players || {};
+    const playerCount = Object.keys(players).length;
+
+    // Phase 1 -> Phase 2 when all p1 votes are in
+    if (state.phase === "p1_vote") {
+      const p1 = state.p1Votes || {};
+      if (Object.keys(p1).length === playerCount && playerCount > 0) {
+        const endsAt = Date.now() + 5 * 60 * 1000;
+        await updateDoc(roomRef(), { phase: "p2_interrogate", p2EndsAt: endsAt });
+      }
+      return;
+    }
+
+    // Phase 2 -> Phase 3 when timer ends
+    if (state.phase === "p2_interrogate") {
+      const endsAt = state.p2EndsAt || 0;
+      if (endsAt && Date.now() >= endsAt) {
+        await updateDoc(roomRef(), { phase: "p3_finalvote" });
+      }
+      return;
+    }
+
+    // Phase 3 -> Phase 4 when all final votes are in
+    if (state.phase === "p3_finalvote") {
+      const p3 = state.p3Votes || {};
+      if (Object.keys(p3).length === playerCount && playerCount > 0) {
+        const { votedOutId, tally } = computeMostVoted(p3);
+        const caught = votedOutId === state.oddId;
+
+        const scores = { ...(state.scores || {}) };
+        if (caught) {
+          // everyone except odd gets a point
+          Object.keys(players).forEach(pid => {
+            if (pid !== state.oddId) scores[pid] = (scores[pid] || 0) + 1;
+          });
+        } else {
+          // odd gets a point
+          scores[state.oddId] = (scores[state.oddId] || 0) + 1;
+        }
+
+        await updateDoc(roomRef(), {
+          phase: "p4_reveal",
+          scores,
+          results: {
+            votedOutId,
+            caught,
+            tally,
+            oddId: state.oddId,
+            question: state.question,
+            p1Votes: state.p1Votes || {},
+            p3Votes: state.p3Votes || {}
+          }
+        });
+      }
+    }
+  }
+
+  function computeMostVoted(voteMap) {
+    const tally = {};
+    Object.values(voteMap).forEach(t => tally[t] = (tally[t] || 0) + 1);
+
+    // pick highest; deterministic tie-break by id sort
+    const entries = Object.entries(tally).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
+    const votedOutId = entries[0]?.[0] || null;
+    return { votedOutId, tally };
+  }
+
+  /* =========================
+     Rendering per phase
+     ========================= */
+  function render(state) {
+    // host hint
+    document.getElementById("hostHint").textContent =
+      state.hostId === playerId ? "You are the host." : `Host: ${state.players?.[state.hostId] || "—"}`;
+
+    // scoreboard in lobby & results
+    renderScores(state);
+
+    // show correct screen
+    if (state.phase === "lobby" || !state.phase) {
+      show("lobby");
+      renderLobbyPlayers(state);
+      return;
+    }
+
+    if (state.phase === "p1_vote") {
+      show("p1");
+      renderPhase1(state);
+      return;
+    }
+
+    if (state.phase === "p2_interrogate") {
+      show("p2");
+      renderPhase2(state);
+      return;
+    }
+
+    if (state.phase === "p3_finalvote") {
+      show("p3");
+      renderPhase3(state);
+      return;
+    }
+
+    if (state.phase === "p4_reveal") {
+      show("p4");
+      renderPhase4(state);
+      return;
+    }
+
+    // fallback
+    show("lobby");
+    renderLobbyPlayers(state);
+  }
+
+  function renderLobbyPlayers(state) {
+    const players = Object.values(state.players || {});
+    document.getElementById("playersBox").innerText =
+      `Code: ${roomId}\n\nPlayers:\n` + players.join(", ");
+
+    // host-only start button text / behavior
+    // (button exists for everyone; host check is in code)
+  }
+
+  function renderScores(state) {
+    const box = document.getElementById("scoreBox");
+    const players = state.players || {};
+    const scores = state.scores || {};
+    const rows = Object.entries(players)
+      .map(([pid, name]) => [name, scores[pid] || 0])
+      .sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]))
+      .map(([name, sc]) => `<div class="scoreRow"><span>${escapeHtml(name)}</span><span class="scoreVal">${sc}</span></div>`)
+      .join("");
+
+    box.innerHTML = `<b>Scoreboard</b><div style="margin-top:8px">${rows || "<span class='small'>No scores yet.</span>"}</div>`;
+
+    // also show score in p4
+    const p4Score = document.getElementById("p4Score");
+    if (p4Score) p4Score.innerHTML = box.innerHTML;
+  }
+
+  function renderPhase1(state) {
+    const q = state.question;
+    const isOdd = playerId === state.oddId;
+    const myQ = isOdd ? q?.odd : q?.normal;
+
+    document.getElementById("p1Question").innerHTML =
+      `<b>Your Prompt:</b><br>${escapeHtml(myQ || "…")}`;
+
+    // vote list
+    const list = document.getElementById("p1VoteList");
+    list.innerHTML = "";
+    const players = state.players || {};
+    const myVote = state.p1Votes?.[playerId];
+
+    Object.entries(players).forEach(([pid, name]) => {
+      if (pid === playerId) return;
+      const b = document.createElement("button");
+      b.textContent = name;
+      b.className = (myVote === pid) ? "selected" : "";
+      b.onclick = () => castP1Vote(pid);
+      list.appendChild(b);
+    });
+
+    const total = Object.keys(players).length;
+    const done = Object.keys(state.p1Votes || {}).length;
+    document.getElementById("p1Status").textContent = `${done}/${total} votes submitted`;
+  }
+
+  function renderPhase2(state) {
+    document.getElementById("p2NormalQ").textContent = state.question?.normal || "";
+
+    // reveal who voted for who (phase1 votes)
+    const players = state.players || {};
+    const p1 = state.p1Votes || {};
+    let html = "<b>Who voted for who (Phase 1):</b><br><br>";
+    Object.entries(p1).forEach(([voter, target]) => {
+      html += `• ${escapeHtml(players[voter] || "Unknown")} voted ${escapeHtml(players[target] || "Unknown")}<br>`;
+    });
+    if (!Object.keys(p1).length) html += "<span class='small'>No votes yet.</span>";
+    document.getElementById("p2WhoVoted").innerHTML = html;
+
+    // timer
+    if (timerInterval) clearInterval(timerInterval);
+    const endsAt = state.p2EndsAt || (Date.now() + 5*60*1000);
+
+    const tick = () => {
+      const left = endsAt - Date.now();
+      document.getElementById("p2Timer").textContent = fmtTime(left);
+    };
+    tick();
+    timerInterval = setInterval(tick, 250);
+
+    // host skip button
+    document.getElementById("skipBtn").style.display =
+      (state.hostId === playerId) ? "block" : "none";
+
+    const total = Object.keys(players).length;
+    const done = Object.keys(p1).length;
+    document.getElementById("p2Status").textContent = `Discuss now. Phase 1 votes were ${done}/${total}.`;
+  }
+
+  function renderPhase3(state) {
+    const list = document.getElementById("p3VoteList");
+    list.innerHTML = "";
+    const players = state.players || {};
+    const myVote = state.p3Votes?.[playerId];
+
+    Object.entries(players).forEach(([pid, name]) => {
+      if (pid === playerId) return;
+      const b = document.createElement("button");
+      b.textContent = name;
+      b.className = (myVote === pid) ? "selected" : "";
+      b.onclick = () => castP3Vote(pid);
+      list.appendChild(b);
+    });
+
+    const total = Object.keys(players).length;
+    const done = Object.keys(state.p3Votes || {}).length;
+    document.getElementById("p3Status").textContent = `${done}/${total} final votes submitted`;
+  }
+
+  function renderPhase4(state) {
+    const players = state.players || {};
+    const res = state.results;
+
+    // host-only next round button note
+    document.getElementById("nextRoundBtn").style.display = (state.hostId === playerId) ? "block" : "none";
+    document.getElementById("p4HostNote").textContent =
+      (state.hostId === playerId) ? "Start the next round when you're ready." : "Waiting for host to start next round…";
+
+    // run reveal animation once per render
+    if (localRevealTimeout) clearTimeout(localRevealTimeout);
+
+    document.getElementById("p4Title").textContent = "Counting votes...";
+    document.getElementById("p4Details").innerHTML = `<span class="small">Stand by…</span>`;
+
+    localRevealTimeout = setTimeout(() => {
+      const votedOutName = players[res.votedOutId] || "Unknown";
+      const oddName = players[res.oddId] || "Unknown";
+      const verdict = res.caught ? `<span class="win">CAUGHT!</span>` : `<span class="lose">ESCAPED!</span>`;
+
+      // tally lines
+      const tallyLines = Object.entries(res.tally || {})
+        .sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]))
+        .map(([pid, n]) => `• ${escapeHtml(players[pid] || "Unknown")}: <b>${n}</b>`)
+        .join("<br>");
+
+      document.getElementById("p4Title").innerHTML = verdict;
+      document.getElementById("p4Details").innerHTML = `
+        <b>Most votes:</b> ${escapeHtml(votedOutName)}<br>
+        <b>The Odd1Owt was:</b> ${escapeHtml(oddName)}<br><br>
+        <b>Final vote tally:</b><br>${tallyLines || "<span class='small'>No votes?</span>"}<br><br>
+        <b>Questions:</b><br>
+        Normal: ${escapeHtml(res.question?.normal || "")}<br>
+        Odd: ${escapeHtml(res.question?.odd || "")}
+      `;
+    }, 1400);
+  }
+
+  function escapeHtml(str) {
+    return String(str ?? "").replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+
+  /* =========================
+     Invite link
+     ========================= */
+  window.copyInvite = function() {
+    navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${roomId}`);
+    alert("Invite link copied!");
+  };
+
+  /* =========================
+     Auto-join from URL
+     ========================= */
+  const params = new URLSearchParams(location.search);
+  if (params.get("room")) {
+    document.getElementById("codeInput").value = params.get("room").toUpperCase();
+    show("join");
+  }
 </script>
-
 </body>
 </html>
