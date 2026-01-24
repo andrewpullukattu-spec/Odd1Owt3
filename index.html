@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Odd1Owt</title>
+
+<style>
+body {
+  background:#0b0b0e;
+  color:white;
+  font-family:system-ui, sans-serif;
+  display:flex;
+  justify-content:center;
+  padding:20px;
+}
+.shell {
+  max-width:420px;
+  width:100%;
+  background:#111114;
+  border-radius:16px;
+  padding:20px;
+}
+h1 { text-align:center; }
+button, input {
+  width:100%;
+  padding:14px;
+  margin-top:10px;
+  border-radius:10px;
+  border:none;
+  font-size:16px;
+}
+button { font-weight:600; cursor:pointer; }
+.red { background:#ef4444; color:white; }
+.white { background:white; color:black; }
+.bubble {
+  background:#1c1c21;
+  padding:16px;
+  border-radius:12px;
+  margin:15px 0;
+}
+</style>
+</head>
+
+<body>
+<div class="shell">
+<h1>Odd1Owt</h1>
+
+<section id="home">
+  <input id="nameInput" placeholder="Your name" />
+  <button class="red" onclick="createRoom()">Create Lobby</button>
+  <button class="white" onclick="show('join')">Join Lobby</button>
+</section>
+
+<section id="join" style="display:none">
+  <input id="codeInput" placeholder="Lobby code" />
+  <button class="red" onclick="joinRoom()">Join</button>
+</section>
+
+<section id="lobby" style="display:none">
+  <div class="bubble" id="playersBox">Waiting for players...</div>
+  <button class="white" onclick="copyLink()">Copy Invite Link</button>
+  <button class="red" onclick="startGame()">Start Game</button>
+</section>
+
+<section id="game" style="display:none">
+  <div class="bubble" id="questionBox"></div>
+</section>
+
+</div>
+
+<!-- 🔥 FIREBASE SDK (SCRIPT TAG – NO NPM) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  updateDoc,
+  onSnapshot,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+/* =====================
+   FIREBASE CONFIG
+===================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCaJ-2d3r_qKcSs4aCdhvzZtjAImnZ8YM",
+  authDomain: "odd1owt-ed87d.firebaseapp.com",
+  projectId: "odd1owt-ed87d",
+  storageBucket: "odd1owt-ed87d.appspot.com",
+  messagingSenderId: "615629953512",
+  appId: "1:615629953512:web:046f611961e7c1e556ec5d"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+console.log("🔥 Firebase connected");
+
+/* =====================
+   GAME STATE
+===================== */
+let roomId = null;
+let unsubscribe = null;
+
+const playerId =
+  localStorage.getItem("odd1owt_playerId") ||
+  crypto.randomUUID();
+
+localStorage.setItem("odd1owt_playerId", playerId);
+
+const questions = [
+  { normal: "Who is the loudest?", odd: "Who whispers aggressively?" },
+  { normal: "Who is the messiest?", odd: "Who cleans at 3am?" },
+  { normal: "Who is always late?", odd: "Who arrives an hour early?" }
+];
+
+/* =====================
+   HELPERS
+===================== */
+function show(id) {
+  document.querySelectorAll("section").forEach(s => s.style.display = "none");
+  document.getElementById(id).style.display = "block";
+}
+
+function randomCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+/* =====================
+   CREATE / JOIN
+===================== */
+window.createRoom = async function () {
+  roomId = randomCode();
+  await joinRoom(roomId, true);
+};
+
+window.joinRoom = async function (codeOverride = null, isHost = false) {
+  roomId = codeOverride || document.getElementById("codeInput").value.trim().toUpperCase();
+  const name = document.getElementById("nameInput").value || "Player";
+
+  const ref = doc(db, "rooms", roomId);
+
+  await setDoc(ref, {
+    players: { [playerId]: name },
+    hostId: isHost ? playerId : null,
+    phase: "lobby",
+    question: null,
+    odd: null
+  }, { merge: true });
+
+  listenRoom();
+  show("lobby");
+};
+
+/* =====================
+   REALTIME LISTENER
+===================== */
+function listenRoom() {
+  if (unsubscribe) unsubscribe();
+
+  const ref = doc(db, "rooms", roomId);
+  unsubscribe = onSnapshot(ref, snap => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+
+    document.getElementById("playersBox").innerText =
+      "Players:\n" + Object.values(data.players).join(", ");
+
+    if (data.phase === "game") {
+      show("game");
+      document.getElementById("questionBox").innerText =
+        playerId === data.odd
+          ? data.question.odd
+          : data.question.normal;
+    }
+  });
+}
+
+/* =====================
+   START GAME
+===================== */
+window.startGame = async function () {
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+
+  if (data.hostId !== playerId) return;
+
+  const ids = Object.keys(data.players);
+  const odd = ids[Math.floor(Math.random() * ids.length)];
+  const q = questions[Math.floor(Math.random() * questions.length)];
+
+  await updateDoc(ref, {
+    phase: "game",
+    odd,
+    question: q
+  });
+};
+
+/* =====================
+   UTIL
+===================== */
+window.copyLink = function () {
+  navigator.clipboard.writeText(
+    location.origin + location.pathname + "?room=" + roomId
+  );
+  alert("Invite link copied");
+};
+
+/* =====================
+   AUTO-JOIN FROM LINK
+===================== */
+const params = new URLSearchParams(location.search);
+if (params.get("room")) {
+  document.getElementById("codeInput").value = params.get("room");
+  show("join");
+}
+</script>
+
+</body>
+</html>
