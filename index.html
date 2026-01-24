@@ -133,13 +133,8 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import {
-    getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot
-  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  /* =========================
-     🔥 FIREBASE CONFIG
-     ========================= */
   const firebaseConfig = {
     apiKey: "AIzaSyCaJ-2d3r_qKcSs4aCdhvzZtjAImnZ8YM",
     authDomain: "odd1owt-ed87d.firebaseapp.com",
@@ -152,9 +147,6 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  /* =========================
-     QUESTIONS (edit freely)
-     ========================= */
   const questions = [
     { normal: 'Who is most likely to be pregnant?', odd: 'Who is most liekly to forget their kid at the park' },
     { normal: 'Who is the most autistic?', odd: 'Who is the most likely to get stuck in revolving doors?' },
@@ -195,12 +187,24 @@
     { normal: 'Who is most likely to lose all their money gambling?', odd: 'Who would be a smart investor?' },
     { normal: 'Who is most likely to get hit by a car?', odd: 'Who is most likely to not know how to ride a bike?' },
     { normal: 'Who is msot likely to be a high school teacher?', odd: 'Who is most likely to get sent to headmaster office as an adult?' },
-    { normal: 'Who is the oldest, like ancient, old as hell, pretty much a fossil at this point, like they got bills to pay why they here playing games?', odd: 'Who eats the most oranges' }   
+    { normal: 'Who is the oldest, like ancient, old as hell, pretty much a fossil at this point, like they got bills to pay why they here playing games?', odd: 'Who eats the most oranges' },
+    { normal: 'Who most likely to be in a threesome?', odd: 'Who most likely to die single ?' },
+    { normal: 'Who is the biggest diva?', odd: 'Who would be the leader of a cult?' },
+    { normal: 'Who would you go to in a time of need?', odd: 'Who is the most woke?' },
+    { normal: 'Who do you see as an older brother/sister?', odd: 'Who would you want doing your surgery?' },
+    { normal: 'Who do you look up to?', odd: 'Most likely to cry in a movie?' },
+    { normal: 'Who is a softy?', odd: 'Who is the most humble?' },
+    { normal: 'Who would you want to back you in a fight?', odd: 'Who will be a great parent when they are older?' },
+    { normal: 'Who is a secret yapper?', odd: 'Who is most likely have eaten raisins today?' },
+    { normal: 'Who do/will you miss the most when they left sheffield?', odd: 'Most likely to run into traffic' },
+    { normal: 'Who got the biggest bum?', odd: 'Most likely to run into traffic' }
+    { normal: 'Who is the best gift giver?', odd: 'Who would you not trust to give you a gift?' },
+    { normal: 'Who is most likely to end up in a wheelchair? ', odd: 'Who would you trust to be your caretaker' },
+    { normal: 'Who lacking the most braincells?', odd: 'Who most likely to pop a snus?' }
+    { normal: 'Who is most likely to write a book?', odd: 'Who is most liekly to star in a movie?' },
+    { normal: 'Biggest ego', odd: 'Who would come last in a race' },    
   ];
 
-  /* =========================
-     PLAYER
-     ========================= */
   const playerId = localStorage.getItem("odd1owt_pid") || crypto.randomUUID();
   localStorage.setItem("odd1owt_pid", playerId);
 
@@ -210,9 +214,6 @@
     return localStorage.getItem("odd1owt_name");
   }
 
-  /* =========================
-     UI helpers
-     ========================= */
   function show(id) {
     document.querySelectorAll("section").forEach(s => s.style.display = "none");
     document.getElementById(id).style.display = "block";
@@ -230,9 +231,6 @@
     return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
   }
 
-  /* =========================
-     Room state
-     ========================= */
   let roomId = null;
   let unsub = null;
   let timerInterval = null;
@@ -242,9 +240,6 @@
     return doc(db, "rooms", roomId);
   }
 
-  /* =========================
-     Create / Join
-     ========================= */
   window.createRoom = async function() {
     const name = getName();
     if (!name) return alert("Enter your name first.");
@@ -276,6 +271,10 @@
       if (taken) return alert("That name is already taken in this lobby.");
     }
 
+    // ✅ STABLE ORDER: append player once, keep forever
+    const existingOrder = Array.isArray(data?.playerOrder) ? data.playerOrder : [];
+    const nextOrder = existingOrder.includes(playerId) ? existingOrder : [...existingOrder, playerId];
+
     const newHost = isHost ? playerId : (data?.hostId || null);
 
     await setDoc(ref, {
@@ -283,6 +282,7 @@
       hostId: newHost,
       phase: data?.phase || "lobby",
       round: data?.round || 0,
+      playerOrder: nextOrder,                 // ✅ NEW
       players: { ...(data?.players || {}), [playerId]: name },
       scores: { ...(data?.scores || {}), [playerId]: data?.scores?.[playerId] ?? 0 }
     }, { merge: true });
@@ -298,22 +298,20 @@
 
       const state = snap.data();
       render(state);
-
-      // host auto-advances phases
       tryHostAdvance(state);
     });
   }
 
-  /* =========================
-     Host controls
-     ========================= */
   window.hostStartRound = async function() {
     const snap = await getDoc(roomRef());
     if (!snap.exists()) return;
     const state = snap.data();
     if (state.hostId !== playerId) return alert("Only the host can start.");
 
-    const ids = Object.keys(state.players || {});
+    const ids = (Array.isArray(state.playerOrder) && state.playerOrder.length)
+      ? state.playerOrder.filter(pid => state.players?.[pid])
+      : Object.keys(state.players || {});
+
     if (ids.length < 3) return alert("Need at least 3 players.");
 
     const oddId = ids[Math.floor(Math.random() * ids.length)];
@@ -341,19 +339,14 @@
     await updateDoc(roomRef(), { phase: "p3_finalvote" });
   };
 
-  /* =========================
-     Voting (Phase 1 & 3)
-     Self-voting ENABLED
-     ========================= */
+  // Voting (self voting enabled)
   async function castP1Vote(targetId) {
     const snap = await getDoc(roomRef());
     if (!snap.exists()) return;
     const state = snap.data();
     if (state.phase !== "p1_vote") return;
 
-    await updateDoc(roomRef(), {
-      [`p1Votes.${playerId}`]: targetId
-    });
+    await updateDoc(roomRef(), { [`p1Votes.${playerId}`]: targetId });
   }
 
   async function castP3Vote(targetId) {
@@ -362,21 +355,15 @@
     const state = snap.data();
     if (state.phase !== "p3_finalvote") return;
 
-    await updateDoc(roomRef(), {
-      [`p3Votes.${playerId}`]: targetId
-    });
+    await updateDoc(roomRef(), { [`p3Votes.${playerId}`]: targetId });
   }
 
-  /* =========================
-     Host auto-advance logic
-     ========================= */
   async function tryHostAdvance(state) {
     if (state.hostId !== playerId) return;
 
     const players = state.players || {};
     const playerCount = Object.keys(players).length;
 
-    // Phase 1 -> Phase 2 when all p1 votes are in
     if (state.phase === "p1_vote") {
       const p1 = state.p1Votes || {};
       if (Object.keys(p1).length === playerCount && playerCount > 0) {
@@ -386,7 +373,6 @@
       return;
     }
 
-    // Phase 2 -> Phase 3 when timer ends
     if (state.phase === "p2_interrogate") {
       const endsAt = state.p2EndsAt || 0;
       if (endsAt && Date.now() >= endsAt) {
@@ -395,7 +381,6 @@
       return;
     }
 
-    // Phase 3 -> Phase 4 when all final votes are in
     if (state.phase === "p3_finalvote") {
       const p3 = state.p3Votes || {};
       if (Object.keys(p3).length === playerCount && playerCount > 0) {
@@ -404,12 +389,8 @@
 
         const scores = { ...(state.scores || {}) };
         if (caught) {
-          // everyone except odd gets a point
-          Object.keys(players).forEach(pid => {
-            if (pid !== state.oddId) scores[pid] = (scores[pid] || 0) + 1;
-          });
+          Object.keys(players).forEach(pid => { if (pid !== state.oddId) scores[pid] = (scores[pid] || 0) + 1; });
         } else {
-          // odd gets a point
           scores[state.oddId] = (scores[state.oddId] || 0) + 1;
         }
 
@@ -417,9 +398,7 @@
           phase: "p4_reveal",
           scores,
           results: {
-            votedOutId,
-            caught,
-            tally,
+            votedOutId, caught, tally,
             oddId: state.oddId,
             question: state.question,
             p1Votes: state.p1Votes || {},
@@ -433,75 +412,60 @@
   function computeMostVoted(voteMap) {
     const tally = {};
     Object.values(voteMap).forEach(t => tally[t] = (tally[t] || 0) + 1);
-
-    // pick highest; deterministic tie-break by id sort
     const entries = Object.entries(tally).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
     const votedOutId = entries[0]?.[0] || null;
     return { votedOutId, tally };
   }
 
-  /* =========================
-     Rendering per phase
-     ========================= */
   function render(state) {
-    // host hint
     document.getElementById("hostHint").textContent =
       state.hostId === playerId ? "You are the host." : `Host: ${state.players?.[state.hostId] || "—"}`;
 
-    // scoreboard in lobby & results
     renderScores(state);
 
-    // show correct screen
     if (state.phase === "lobby" || !state.phase) {
       show("lobby");
       renderLobbyPlayers(state);
       return;
     }
+    if (state.phase === "p1_vote") { show("p1"); renderPhase1(state); return; }
+    if (state.phase === "p2_interrogate") { show("p2"); renderPhase2(state); return; }
+    if (state.phase === "p3_finalvote") { show("p3"); renderPhase3(state); return; }
+    if (state.phase === "p4_reveal") { show("p4"); renderPhase4(state); return; }
 
-    if (state.phase === "p1_vote") {
-      show("p1");
-      renderPhase1(state);
-      return;
-    }
-
-    if (state.phase === "p2_interrogate") {
-      show("p2");
-      renderPhase2(state);
-      return;
-    }
-
-    if (state.phase === "p3_finalvote") {
-      show("p3");
-      renderPhase3(state);
-      return;
-    }
-
-    if (state.phase === "p4_reveal") {
-      show("p4");
-      renderPhase4(state);
-      return;
-    }
-
-    // fallback
     show("lobby");
     renderLobbyPlayers(state);
   }
 
+  function getOrder(state) {
+    const players = state.players || {};
+    const order = Array.isArray(state.playerOrder) && state.playerOrder.length
+      ? state.playerOrder.filter(pid => players[pid])
+      : Object.keys(players);
+    return order;
+  }
+
   function renderLobbyPlayers(state) {
-    const players = Object.values(state.players || {});
+    const players = state.players || {};
+    const order = getOrder(state);
+    const names = order.map(pid => players[pid]).filter(Boolean);
+
     document.getElementById("playersBox").innerText =
-      `Code: ${roomId}\n\nPlayers:\n` + players.join(", ");
+      `Code: ${roomId}\n\nPlayers:\n` + names.join(", ");
   }
 
   function renderScores(state) {
     const box = document.getElementById("scoreBox");
     const players = state.players || {};
     const scores = state.scores || {};
-    const rows = Object.entries(players)
-      .map(([pid, name]) => [name, scores[pid] || 0])
-      .sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]))
-      .map(([name, sc]) => `<div class="scoreRow"><span>${escapeHtml(name)}</span><span class="scoreVal">${sc}</span></div>`)
-      .join("");
+    const order = getOrder(state);
+
+    // show in stable order, but still show score
+    const rows = order.map(pid => {
+      const name = players[pid];
+      const sc = scores[pid] || 0;
+      return `<div class="scoreRow"><span>${escapeHtml(name)}</span><span class="scoreVal">${sc}</span></div>`;
+    }).join("");
 
     box.innerHTML = `<b>Scoreboard</b><div style="margin-top:8px">${rows || "<span class='small'>No scores yet.</span>"}</div>`;
 
@@ -517,13 +481,16 @@
     document.getElementById("p1Question").innerHTML =
       `<b>Your Prompt:</b><br>${escapeHtml(myQ || "…")}`;
 
-    // vote list (SELF INCLUDED)
+    // ✅ stable vote list order
     const list = document.getElementById("p1VoteList");
     list.innerHTML = "";
     const players = state.players || {};
     const myVote = state.p1Votes?.[playerId];
+    const order = getOrder(state);
 
-    Object.entries(players).forEach(([pid, name]) => {
+    order.forEach(pid => {
+      const name = players[pid];
+      if (!name) return;
       const b = document.createElement("button");
       b.textContent = pid === playerId ? `${name} (You)` : name;
       b.className = (myVote === pid) ? "selected" : "";
@@ -539,7 +506,6 @@
   function renderPhase2(state) {
     document.getElementById("p2NormalQ").textContent = state.question?.normal || "";
 
-    // reveal who voted for who (phase1 votes)
     const players = state.players || {};
     const p1 = state.p1Votes || {};
     let html = "<b>Who voted for who (Phase 1):</b><br><br>";
@@ -549,7 +515,6 @@
     if (!Object.keys(p1).length) html += "<span class='small'>No votes yet.</span>";
     document.getElementById("p2WhoVoted").innerHTML = html;
 
-    // timer
     if (timerInterval) clearInterval(timerInterval);
     const endsAt = state.p2EndsAt || (Date.now() + 5*60*1000);
 
@@ -560,7 +525,6 @@
     tick();
     timerInterval = setInterval(tick, 250);
 
-    // host skip button
     document.getElementById("skipBtn").style.display =
       (state.hostId === playerId) ? "block" : "none";
 
@@ -574,9 +538,12 @@
     list.innerHTML = "";
     const players = state.players || {};
     const myVote = state.p3Votes?.[playerId];
+    const order = getOrder(state);
 
-    // final vote list (SELF INCLUDED)
-    Object.entries(players).forEach(([pid, name]) => {
+    // ✅ stable vote list order
+    order.forEach(pid => {
+      const name = players[pid];
+      if (!name) return;
       const b = document.createElement("button");
       b.textContent = pid === playerId ? `${name} (You)` : name;
       b.className = (myVote === pid) ? "selected" : "";
@@ -630,17 +597,11 @@
     }[m]));
   }
 
-  /* =========================
-     Invite link
-     ========================= */
   window.copyInvite = function() {
     navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${roomId}`);
     alert("Invite link copied!");
   };
 
-  /* =========================
-     Auto-join from URL
-     ========================= */
   const params = new URLSearchParams(location.search);
   if (params.get("room")) {
     document.getElementById("codeInput").value = params.get("room").toUpperCase();
@@ -649,4 +610,3 @@
 </script>
 </body>
 </html>
-
