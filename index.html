@@ -23,6 +23,7 @@
     .btn-red{background:var(--red);border-color:transparent;color:white}
     .btn-white{background:white;border-color:transparent;color:black}
     .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn-danger{background:transparent;border:1px solid #ef4444;color:#ef4444;font-size:13px;padding:8px 12px;width:auto;border-radius:8px}
     .row{display:flex;gap:10px}
     .row > *{flex:1}
     .small{font-size:12px;color:var(--muted)}
@@ -33,6 +34,19 @@
     .scoreVal{color:var(--gold);font-weight:900}
     .timer{font-size:52px;font-weight:950;text-align:center;color:var(--red);margin:10px 0}
     .center{text-align:center}
+
+    /* Player row with kick button */
+    .playerRow{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+    .playerRow:last-child{border-bottom:none}
+    .playerName{font-size:15px}
+
+    /* Deck picker */
+    .deckGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+    .deckBtn{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 12px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-weight:700;font-size:14px;color:var(--text);width:100%}
+    .deckBtn:hover{border-color:rgba(255,255,255,0.2)}
+    .deckBtn.active{border-color:var(--red);background:rgba(239,68,68,0.1)}
+    .deckIcon{font-size:28px;display:block;margin-bottom:6px}
+    .deckDesc{font-size:11px;color:var(--muted);font-weight:400;margin-top:4px;line-height:1.3}
 
     /* Phase 4 animation */
     .revealWrap{margin-top:10px}
@@ -54,6 +68,10 @@
     .big{font-size:26px;font-weight:950}
     .win{color:var(--green);font-weight:950}
     .lose{color:var(--red);font-weight:950}
+
+    /* Reveal steps */
+    .revealStep{opacity:0;transform:translateY(8px);transition:opacity .4s ease, transform .4s ease}
+    .revealStep.visible{opacity:1;transform:translateY(0)}
   </style>
 </head>
 
@@ -83,6 +101,13 @@
     <div class="tag">Lobby</div>
     <div class="bubble" id="playersBox">Waiting for players...</div>
     <div class="bubble" id="scoreBox"></div>
+
+    <!-- Deck picker (host only) -->
+    <div id="deckPickerWrap" style="display:none">
+      <div class="tag" style="margin-top:4px">Question Deck</div>
+      <div class="deckGrid" id="deckGrid"></div>
+    </div>
+
     <button class="btn-white" onclick="copyInvite()">Copy Invite Link</button>
     <button class="btn-red" style="margin-top:10px" onclick="hostStartRound()">Start Round</button>
     <div class="small center" id="hostHint" style="margin-top:10px"></div>
@@ -121,8 +146,24 @@
     <div class="revealWrap">
       <div class="revealBox">
         <div class="sweep"></div>
-        <div class="center big" id="p4Title">Revealing...</div>
-        <div class="bubble" id="p4Details" style="margin-top:12px"></div>
+
+        <!-- Step 1: the real question -->
+        <div class="revealStep" id="r-question">
+          <div class="small" style="margin-bottom:6px">The real question was…</div>
+          <div style="font-size:18px;font-weight:800;line-height:1.3" id="r-questionText"></div>
+        </div>
+
+        <!-- Step 2: who voted for who -->
+        <div class="revealStep" id="r-votes" style="margin-top:14px">
+          <div class="small" style="margin-bottom:6px">Who voted for who:</div>
+          <div id="r-voteLines" style="line-height:1.8;font-size:14px"></div>
+        </div>
+
+        <!-- Step 3: verdict -->
+        <div class="revealStep" id="r-verdict" style="margin-top:14px">
+          <div class="center big" id="p4Title">…</div>
+          <div id="p4Details" style="margin-top:10px;font-size:14px;line-height:1.6"></div>
+        </div>
       </div>
     </div>
     <div class="bubble" id="p4Score"></div>
@@ -147,107 +188,237 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // ✅ BIG QUESTION BANK (single list, not pairs)
-  const questionBank = [
-    "Who is most likely to be pregnant?",
-    "Who is most likely to forget their kid at the park?",
-    "Who is the most awkward in public?",
-    "Who is most likely to get stuck in revolving doors?",
-    "Who is most likely to crash their car?",
-    "Who is the messiest?",
-    "Who is most independent?",
-    "Who is most likely to be sports captain?",
-    "Who is the loudest?",
-    "Who is the meanest?",
-    "Who is the biggest gossip?",
-    "Who is most likely to burn a cookie?",
-    "Who is the biggest yapper?",
-    "Who is always on DND?",
-    "Who has the best fashion?",
-    "Who is the biggest money saver?",
-    "Who is short-tempered?",
-    "Who is composed?",
-    "Who is most likely to get cancelled?",
-    "Who is the least controversial?",
-    "Who is most likely to have 10 kids?",
-    "Who is most likely to become an influencer?",
-    "Who is most likely to read 50 books in a year?",
-    "Who is most likely to watch a movie and pretend they read the book?",
-    "Who is most likely to own 10 cats?",
-    "Who is most likely to adopt a random pet on impulse?",
-    "Who is the most childish?",
-    "Who is most likely to have cereal with water?",
-    "Who is the most responsible?",
-    "Who is most likely to cross the road without looking?",
-    "Who is most likely to elope?",
-    "Who is most likely to disappear for 48 hours with no explanation?",
-    "Who is the zestiest?",
-    "Who is the most brainrotted?",
-    "Who is girlypop?",
-    "Who is least likely to live in a house full of girls?",
-    "Who is the most manly?",
-    "Who wouldn’t kill a spider?",
-    "Who is most likely to go to jail?",
-    "Who would be the best lawyer?",
-    "Who is most likely to become a priest?",
-    "Who is the first person to get drunk at a party?",
-    "Who is most likely to go on Love Island?",
-    "Who is most likely to get married first?",
-    "Who is most likely to injure themself?",
-    "Who most likely to be referred to as unc or aunt?",
-    "Who smells the best?",
-    "Who is most likely to wear a dress?",
-    "Who looks best in traditional clothes?",
-    "Who would look best in a saree?",
-    "Who is the most innocent?",
-    "Who is the biggest demon?",
-    "Who is the kindest?",
-    "Who is most likely to talk to a homeless man?",
-    "Who is the most mature?",
-    "Who would forget their own phone number?",
-    "Who is the most nonchalant?",
-    "Who is the most bait?",
-    "Who is the smartest?",
-    "Who is most likely to wear odd socks?",
-    "Who is the funniest?",
-    "Who would survive against a gorilla?",
-    "Who is most likely to get hit on the head with a ball?",
-    "Who is thick in the head?",
-    "Who is the pickiest eater?",
-    "Who is the most adventurous?",
-    "Who is most likely to lose all their money gambling?",
-    "Who is most likey to overshare?",
-    "Who has the biggest bum?",
-    "Who is the most brainrotted?",
-    "Who would you go to in a time of need?",
-    "Who do you look up to?",
-    "Who is the most wibes?",
-    "Who is the most autistic?",
-    "Who is most likely to swing the other way?",
-    "Who is most likely to have had a threesome?",
-    "Biggest Manipulator",
-    "Who has got the most rizz?",
-    "Most likely to become swen",
-    "Most high",
-    "Most likely to die first",
-    "Most likely to live the longest",
-    "Most likely to go viral for the wrong reason",
-    "Most likely to ruin someone life with bad advice",
-    "Who is most likely to invent something amazing",
-    "Who is the msot racist",
-    "Who is the most stubborn",
-    "Who the most likely to become a wolf",
-    "Deadest baller",
-    "Best Dancer",
-    "Last person you would date",
-    "Least likely to get married",
-    "Biggest Troll",
-    "Biggest ego",
-    "Who chats the most shit"
-  ];
+  // ─── QUESTION DECKS ────────────────────────────────────────────────────────
+
+  const DECKS = {
+    classic: {
+      label: "Classic",
+      icon: "🎯",
+      desc: "The original mix",
+      questions: [
+        "Who is most likely to be pregnant?",
+        "Who is most likely to forget their kid at the park?",
+        "Who is the most awkward in public?",
+        "Who is most likely to get stuck in revolving doors?",
+        "Who is most likely to crash their car?",
+        "Who is the messiest?",
+        "Who is most independent?",
+        "Who is most likely to be sports captain?",
+        "Who is the loudest?",
+        "Who is the meanest?",
+        "Who is the biggest gossip?",
+        "Who is most likely to burn a cookie?",
+        "Who is the biggest yapper?",
+        "Who is always on DND?",
+        "Who has the best fashion?",
+        "Who is the biggest money saver?",
+        "Who is short-tempered?",
+        "Who is composed?",
+        "Who is most likely to get cancelled?",
+        "Who is the least controversial?",
+        "Who is most likely to have 10 kids?",
+        "Who is most likely to become an influencer?",
+        "Who is most likely to read 50 books in a year?",
+        "Who is most likely to watch a movie and pretend they read the book?",
+        "Who is most likely to own 10 cats?",
+        "Who is most likely to adopt a random pet on impulse?",
+        "Who is the most childish?",
+        "Who is most likely to have cereal with water?",
+        "Who is the most responsible?",
+        "Who is most likely to cross the road without looking?",
+        "Who is most likely to elope?",
+        "Who is most likely to disappear for 48 hours with no explanation?",
+        "Who is the zestiest?",
+        "Who is the most brainrotted?",
+        "Who is girlypop?",
+        "Who is least likely to live in a house full of girls?",
+        "Who is the most manly?",
+        "Who wouldn't kill a spider?",
+        "Who is most likely to go to jail?",
+        "Who would be the best lawyer?",
+        "Who is most likely to become a priest?",
+        "Who is the first person to get drunk at a party?",
+        "Who is most likely to go on Love Island?",
+        "Who is most likely to get married first?",
+        "Who is most likely to injure themselves?",
+        "Who is most likely to be referred to as unc or aunt?",
+        "Who smells the best?",
+        "Who is most likely to wear a dress?",
+        "Who looks best in traditional clothes?",
+        "Who would look best in a saree?",
+        "Who is the most innocent?",
+        "Who is the biggest demon?",
+        "Who is the kindest?",
+        "Who is most likely to talk to a homeless man?",
+        "Who is the most mature?",
+        "Who would forget their own phone number?",
+        "Who is the most nonchalant?",
+        "Who is the most bait?",
+        "Who is the smartest?",
+        "Who is most likely to wear odd socks?",
+        "Who is the funniest?",
+        "Who would survive against a gorilla?",
+        "Who is most likely to get hit on the head with a ball?",
+        "Who is thick in the head?",
+        "Who is the pickiest eater?",
+        "Who is the most adventurous?",
+        "Who is most likely to lose all their money gambling?",
+        "Who is most likely to overshare?",
+        "Who has the biggest bum?",
+        "Who would you go to in a time of need?",
+        "Who do you look up to?",
+        "Who is the most vibes?",
+        "Who is the most stubborn?",
+        "Best Dancer",
+        "Last person you would date",
+        "Least likely to get married",
+        "Biggest Troll",
+        "Biggest ego",
+        "Who chats the most shit"
+      ]
+    },
+    spicy: {
+      label: "Spicy 🌶️",
+      icon: "🔥",
+      desc: "Adults only, no filter",
+      questions: [
+        "Who is most likely to swing the other way?",
+        "Who is most likely to have had a threesome?",
+        "Biggest Manipulator",
+        "Who has the most rizz?",
+        "Most high",
+        "Most likely to die first",
+        "Most likely to go viral for the wrong reason",
+        "Most likely to ruin someone's life with bad advice",
+        "Who is the most racist?",
+        "Who is most likely to become a wolf?",
+        "Who chats the most shit?",
+        "Who is the biggest demon?",
+        "Who is most likely to go to jail?",
+        "Who would be cancelled first?",
+        "Who is the sneakiest?",
+        "Who has the darkest search history?",
+        "Who is most likely to ghost someone they like?",
+        "Who is the biggest player?",
+        "Who lies the most?",
+        "Who is most likely to start a cult?",
+        "Who has the most red flags?",
+        "Who would sell out their best friend for £50?",
+        "Who is the biggest attention seeker?",
+        "Who is most likely to get with their mate's ex?",
+        "Who is the most jealous?",
+        "Who would survive the longest in a horror movie?",
+        "Who is most likely to get blackout drunk on a Tuesday?",
+        "Who would be the worst ex?",
+        "Who is most likely to slide into a celebrity's DMs?",
+        "Who is the most toxic?",
+        "Who would date someone twice their age?",
+        "Who is most likely to throw their friend under the bus?",
+        "Who secretly fancies someone in the group?",
+        "Who has kissed the most people in this room?",
+        "Who is the biggest hypocrite?"
+      ]
+    },
+    deepcut: {
+      label: "Deep Cut",
+      icon: "🧠",
+      desc: "Personality & real talk",
+      questions: [
+        "Who is most likely to invent something amazing?",
+        "Most likely to live the longest",
+        "Who is the most autistic?",
+        "Who do you look up to?",
+        "Who would you go to in a time of need?",
+        "Who is the most mature?",
+        "Who is the most composed?",
+        "Who is the most self-aware?",
+        "Who is most likely to change the world?",
+        "Who is the most emotionally intelligent?",
+        "Who will be most successful in 10 years?",
+        "Who is most likely to write a book?",
+        "Who has the most potential they haven't used yet?",
+        "Who is the most genuine person here?",
+        "Who works the hardest?",
+        "Who cares the most about others?",
+        "Who is the best listener?",
+        "Who is the most likely to be famous one day?",
+        "Who would make the best parent?",
+        "Who is the most underrated person in this group?",
+        "Who keeps the group together?",
+        "Who do people underestimate the most?",
+        "Who is the most resilient?",
+        "Who has gone through the most and still smiles?",
+        "Who is most likely to make a difference in someone's life?",
+        "Who gives the best advice?",
+        "Who is most likely to become a CEO?",
+        "Who would be the best therapist?",
+        "Who thinks before they speak the most?",
+        "Who is the most creative?",
+        "Who has the most unique perspective on life?",
+        "Who is most likely to move abroad?",
+        "Who is the most open-minded?",
+        "Who has grown the most as a person?",
+        "Who is the most likely to be content with their life in 20 years?"
+      ]
+    },
+    randoms: {
+      label: "Randoms",
+      icon: "🎲",
+      desc: "Weird & unhinged",
+      questions: [
+        "Deadest baller",
+        "Most likely to become swen",
+        "Who is most likely to become a wolf?",
+        "Who would forget their own phone number?",
+        "Who is most likely to have cereal with water?",
+        "Who is thick in the head?",
+        "Who is most likely to get hit on the head with a ball?",
+        "Who would survive against a gorilla?",
+        "Who is most likely to get stuck in revolving doors?",
+        "Who would accidentally set off a fire alarm?",
+        "Who would lose a fight to a 10-year-old?",
+        "Who would try to pay with the wrong currency abroad?",
+        "Who would get lost in a straight road?",
+        "Who is most likely to accidentally send a meme to their mum?",
+        "Who would eat food that fell on the floor?",
+        "Who is most likely to trip over nothing?",
+        "Who would forget where they parked their car?",
+        "Who would try to charge a disposable camera?",
+        "Who would wave back at someone who wasn't waving at them?",
+        "Who would argue with a satnav?",
+        "Who would put salt in their tea by mistake?",
+        "Who would try to push a pull door multiple times?",
+        "Who would lock themselves out of their house barefoot?",
+        "Who is most likely to get their head stuck in a fence?",
+        "Who would accidentally like a 3-year-old photo while stalking someone?",
+        "Who would reply-all to a work email by mistake?",
+        "Who would confuse left and right in their 20s?",
+        "Who is most likely to walk into a glass door?",
+        "Who would fall asleep on the bus and miss their stop?",
+        "Who would bring a fork to a soup meal?",
+        "Who would name their WiFi something embarrassing?",
+        "Who would call a teacher 'mum' in secondary school?",
+        "Who would text the wrong person and not notice for 10 minutes?",
+        "Who is most likely to accidentally FaceTime someone?",
+        "Who would show up to a fancy event underdressed?"
+      ]
+    }
+  };
+
+  const DEFAULT_DECK = "classic";
+
+  // ─── STATE ─────────────────────────────────────────────────────────────────
 
   const playerId = localStorage.getItem("odd1owt_pid") || crypto.randomUUID();
   localStorage.setItem("odd1owt_pid", playerId);
+
+  let roomId = null;
+  let unsub = null;
+  let timerInterval = null;
+  let revealTimeouts = [];
+  let selectedDeck = DEFAULT_DECK;
+
+  // ─── HELPERS ───────────────────────────────────────────────────────────────
 
   function getName() {
     const typed = document.getElementById("nameInput").value.trim();
@@ -272,29 +443,46 @@
     return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
   }
 
-  let roomId = null;
-  let unsub = null;
-  let timerInterval = null;
-  let localRevealTimeout = null;
-
   function roomRef() {
     return doc(db, "rooms", roomId);
   }
 
-  // ✅ Pick a question id, avoiding repeats in usedQIds if possible
+  function escapeHtml(str) {
+    return String(str ?? "").replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+
+  // ─── DECK PICKER UI ────────────────────────────────────────────────────────
+
+  function renderDeckPicker(activeDeck) {
+    const grid = document.getElementById("deckGrid");
+    grid.innerHTML = "";
+    Object.entries(DECKS).forEach(([key, deck]) => {
+      const btn = document.createElement("button");
+      btn.className = "deckBtn" + (activeDeck === key ? " active" : "");
+      btn.innerHTML = `<span class="deckIcon">${deck.icon}</span>${deck.label}<div class="deckDesc">${deck.desc}</div>`;
+      btn.onclick = () => {
+        selectedDeck = key;
+        renderDeckPicker(key);
+        // Persist deck choice to Firestore so everyone can see it
+        updateDoc(roomRef(), { activeDeck: key }).catch(() => {});
+      };
+      grid.appendChild(btn);
+    });
+  }
+
+  // ─── QUESTION PICKING ──────────────────────────────────────────────────────
+
   function pickQuestionId(state, excludeIds = []) {
+    const deckKey = state.activeDeck || DEFAULT_DECK;
+    const bank = (DECKS[deckKey] || DECKS[DEFAULT_DECK]).questions;
     const usedQIds = Array.isArray(state.usedQIds) ? state.usedQIds : [];
-    const allIds = Array.from({ length: questionBank.length }, (_, i) => i);
+    const allIds = Array.from({ length: bank.length }, (_, i) => i);
 
-    // Try: unused & not excluded
     let available = allIds.filter(i => !usedQIds.includes(i) && !excludeIds.includes(i));
+    if (available.length === 0) available = allIds.filter(i => !excludeIds.includes(i));
 
-    // If exhausted, allow reuse (but still not excluded)
-    if (available.length === 0) {
-      available = allIds.filter(i => !excludeIds.includes(i));
-    }
-
-    // Avoid immediate repeats if possible
     const lastQIds = Array.isArray(state.lastQIds) ? state.lastQIds : [];
     if (available.length > 1 && lastQIds.length) {
       const filtered = available.filter(i => !lastQIds.includes(i));
@@ -303,6 +491,8 @@
 
     return available[Math.floor(Math.random() * available.length)];
   }
+
+  // ─── ROOM CREATION & JOINING ───────────────────────────────────────────────
 
   window.createRoom = async function() {
     const name = getName();
@@ -332,10 +522,8 @@
       if (taken) return alert("That name is already taken in this lobby.");
     }
 
-    // ✅ STABLE ORDER
     const existingOrder = Array.isArray(data?.playerOrder) ? data.playerOrder : [];
     const nextOrder = existingOrder.includes(playerId) ? existingOrder : [...existingOrder, playerId];
-
     const newHost = isHost ? playerId : (data?.hostId || null);
 
     await setDoc(ref, {
@@ -343,11 +531,9 @@
       hostId: newHost,
       phase: data?.phase || "lobby",
       round: data?.round || 0,
-
-      // ✅ question anti-repeat tracking
+      activeDeck: data?.activeDeck || DEFAULT_DECK,
       usedQIds: data?.usedQIds || [],
       lastQIds: data?.lastQIds || [],
-
       playerOrder: nextOrder,
       players: { ...(data?.players || {}), [playerId]: name },
       scores: { ...(data?.scores || {}), [playerId]: data?.scores?.[playerId] ?? 0 }
@@ -362,12 +548,41 @@
     unsub = onSnapshot(roomRef(), snap => {
       if (!snap.exists()) return;
       const state = snap.data();
+
+      // If we were kicked, boot back to home
+      if (state.phase === "lobby" && !state.players?.[playerId]) {
+        if (unsub) unsub();
+        roomId = null;
+        show("home");
+        alert("You were removed from the lobby.");
+        return;
+      }
+
       render(state);
       tryHostAdvance(state);
     });
   }
 
-  // ✅ Start round: choose Odd player + choose TWO DIFFERENT questions
+  // ─── HOST: KICK PLAYER ─────────────────────────────────────────────────────
+
+  window.kickPlayer = async function(targetId) {
+    const snap = await getDoc(roomRef());
+    if (!snap.exists()) return;
+    const state = snap.data();
+    if (state.hostId !== playerId) return;
+    if (targetId === playerId) return;
+
+    const players = { ...state.players };
+    const scores = { ...state.scores };
+    const playerOrder = (state.playerOrder || []).filter(pid => pid !== targetId);
+    delete players[targetId];
+    delete scores[targetId];
+
+    await updateDoc(roomRef(), { players, scores, playerOrder });
+  };
+
+  // ─── HOST: START ROUND ─────────────────────────────────────────────────────
+
   window.hostStartRound = async function() {
     const snap = await getDoc(roomRef());
     if (!snap.exists()) return;
@@ -381,17 +596,17 @@
     if (ids.length < 3) return alert("Need at least 3 players.");
 
     const oddId = ids[Math.floor(Math.random() * ids.length)];
+    const deckKey = state.activeDeck || DEFAULT_DECK;
+    const bank = (DECKS[deckKey] || DECKS[DEFAULT_DECK]).questions;
 
     const normalQId = pickQuestionId(state, []);
     const oddQId = pickQuestionId(state, [normalQId]);
 
-    const normalQuestion = questionBank[normalQId];
-    const oddQuestion = questionBank[oddQId];
+    const normalQuestion = bank[normalQId];
+    const oddQuestion = bank[oddQId];
 
     const prevUsed = Array.isArray(state.usedQIds) ? state.usedQIds : [];
-    const remainingCount = questionBank.length - prevUsed.length;
-
-    // If basically exhausted, reset used list cleanly
+    const remainingCount = bank.length - prevUsed.length;
     const nextUsed = (remainingCount < 2)
       ? [normalQId, oddQId]
       : Array.from(new Set([...prevUsed, normalQId, oddQId]));
@@ -400,18 +615,12 @@
       phase: "p1_vote",
       round: (state.round || 0) + 1,
       oddId,
-
-      // ✅ store separate questions
       normalQuestion,
       oddQuestion,
       normalQId,
       oddQId,
-
-      // ✅ anti-repeat tracking
       usedQIds: nextUsed,
       lastQIds: [normalQId, oddQId],
-
-      // reset round data
       p1Votes: {},
       p3Votes: {},
       p2EndsAt: null,
@@ -428,6 +637,8 @@
     await updateDoc(roomRef(), { phase: "p3_finalvote" });
   };
 
+  // ─── VOTING ────────────────────────────────────────────────────────────────
+
   async function castP1Vote(targetId) {
     const snap = await getDoc(roomRef());
     if (!snap.exists()) return;
@@ -443,6 +654,8 @@
     if (state.phase !== "p3_finalvote") return;
     await updateDoc(roomRef(), { [`p3Votes.${playerId}`]: targetId });
   }
+
+  // ─── HOST AUTO-ADVANCE ─────────────────────────────────────────────────────
 
   async function tryHostAdvance(state) {
     if (state.hostId !== playerId) return;
@@ -506,20 +719,23 @@
     return { votedOutId, tally };
   }
 
+  // ─── RENDER ────────────────────────────────────────────────────────────────
+
   function render(state) {
+    const isHost = state.hostId === playerId;
     document.getElementById("hostHint").textContent =
-      state.hostId === playerId ? "You are the host." : `Host: ${state.players?.[state.hostId] || "—"}`;
+      isHost ? "You are the host." : `Host: ${state.players?.[state.hostId] || "—"}`;
 
     renderScores(state);
 
-    if (state.phase === "lobby" || !state.phase) { show("lobby"); renderLobbyPlayers(state); return; }
-    if (state.phase === "p1_vote") { show("p1"); renderPhase1(state); return; }
+    if (state.phase === "lobby" || !state.phase) { show("lobby"); renderLobby(state); return; }
+    if (state.phase === "p1_vote")      { show("p1"); renderPhase1(state); return; }
     if (state.phase === "p2_interrogate") { show("p2"); renderPhase2(state); return; }
     if (state.phase === "p3_finalvote") { show("p3"); renderPhase3(state); return; }
-    if (state.phase === "p4_reveal") { show("p4"); renderPhase4(state); return; }
+    if (state.phase === "p4_reveal")    { show("p4"); renderPhase4(state); return; }
 
     show("lobby");
-    renderLobbyPlayers(state);
+    renderLobby(state);
   }
 
   function getOrder(state) {
@@ -530,13 +746,45 @@
     return order;
   }
 
-  function renderLobbyPlayers(state) {
+  // ─── LOBBY ─────────────────────────────────────────────────────────────────
+
+  function renderLobby(state) {
     const players = state.players || {};
     const order = getOrder(state);
-    const names = order.map(pid => players[pid]).filter(Boolean);
+    const isHost = state.hostId === playerId;
 
-    document.getElementById("playersBox").innerText =
-      `Code: ${roomId}\n\nPlayers:\n` + names.join(", ");
+    // Players box — host sees kick buttons
+    let html = `<div style="margin-bottom:10px"><b>Code: ${escapeHtml(roomId)}</b></div>`;
+    order.forEach(pid => {
+      const name = players[pid];
+      if (!name) return;
+      const isMe = pid === playerId;
+      const isThisHost = pid === state.hostId;
+      const label = escapeHtml(name) + (isMe ? " (You)" : "") + (isThisHost ? " 👑" : "");
+      if (isHost && !isMe) {
+        html += `<div class="playerRow">
+          <span class="playerName">${label}</span>
+          <button class="btn-danger" onclick="kickPlayer('${escapeHtml(pid)}')">Remove</button>
+        </div>`;
+      } else {
+        html += `<div class="playerRow"><span class="playerName">${label}</span></div>`;
+      }
+    });
+    document.getElementById("playersBox").innerHTML = html;
+
+    // Deck picker — host only
+    const wrap = document.getElementById("deckPickerWrap");
+    if (isHost) {
+      wrap.style.display = "block";
+      renderDeckPicker(state.activeDeck || DEFAULT_DECK);
+    } else {
+      wrap.style.display = "none";
+      // Show non-hosts which deck is selected
+      const deckKey = state.activeDeck || DEFAULT_DECK;
+      const deck = DECKS[deckKey] || DECKS[DEFAULT_DECK];
+      document.getElementById("playersBox").innerHTML +=
+        `<div class="small" style="margin-top:10px">Deck: ${deck.icon} ${deck.label}</div>`;
+    }
   }
 
   function renderScores(state) {
@@ -556,6 +804,8 @@
     const p4Score = document.getElementById("p4Score");
     if (p4Score) p4Score.innerHTML = box.innerHTML;
   }
+
+  // ─── PHASE 1 ───────────────────────────────────────────────────────────────
 
   function renderPhase1(state) {
     const isOdd = playerId === state.oddId;
@@ -585,6 +835,8 @@
     document.getElementById("p1Status").textContent = `${done}/${total} votes submitted`;
   }
 
+  // ─── PHASE 2 ───────────────────────────────────────────────────────────────
+
   function renderPhase2(state) {
     document.getElementById("p2NormalQ").textContent = state.normalQuestion || "";
 
@@ -599,7 +851,6 @@
 
     if (timerInterval) clearInterval(timerInterval);
     const endsAt = state.p2EndsAt || (Date.now() + 5*60*1000);
-
     const tick = () => {
       const left = endsAt - Date.now();
       document.getElementById("p2Timer").textContent = fmtTime(left);
@@ -614,6 +865,8 @@
     const done = Object.keys(p1).length;
     document.getElementById("p2Status").textContent = `Discuss now. Phase 1 votes were ${done}/${total}.`;
   }
+
+  // ─── PHASE 3 ───────────────────────────────────────────────────────────────
 
   function renderPhase3(state) {
     const list = document.getElementById("p3VoteList");
@@ -637,6 +890,8 @@
     document.getElementById("p3Status").textContent = `${done}/${total} final votes submitted`;
   }
 
+  // ─── PHASE 4 — staged reveal ───────────────────────────────────────────────
+
   function renderPhase4(state) {
     const players = state.players || {};
     const res = state.results;
@@ -645,15 +900,38 @@
     document.getElementById("p4HostNote").textContent =
       (state.hostId === playerId) ? "Start the next round when you're ready." : "Waiting for host to start next round…";
 
-    if (localRevealTimeout) clearTimeout(localRevealTimeout);
+    // Clear previous timeouts & hide all steps
+    revealTimeouts.forEach(t => clearTimeout(t));
+    revealTimeouts = [];
+    document.querySelectorAll(".revealStep").forEach(el => el.classList.remove("visible"));
 
-    document.getElementById("p4Title").textContent = "Counting votes...";
-    document.getElementById("p4Details").innerHTML = `<span class="small">Stand by…</span>`;
+    if (!res) return;
 
-    localRevealTimeout = setTimeout(() => {
-      const votedOutName = players[res.votedOutId] || "Unknown";
-      const oddName = players[res.oddId] || "Unknown";
-      const verdict = res.caught ? `<span class="win">CAUGHT!</span>` : `<span class="lose">ESCAPED!</span>`;
+    const votedOutName = players[res.votedOutId] || "Unknown";
+    const oddName = players[res.oddId] || "Unknown";
+
+    // Step 1 — show the real question (800ms)
+    revealTimeouts.push(setTimeout(() => {
+      document.getElementById("r-questionText").textContent = res.normalQuestion || "—";
+      document.getElementById("r-question").classList.add("visible");
+    }, 800));
+
+    // Step 2 — show who voted for who (2200ms)
+    revealTimeouts.push(setTimeout(() => {
+      const p1 = state.p1Votes || {};
+      let lines = "";
+      Object.entries(p1).forEach(([voter, target]) => {
+        lines += `• ${escapeHtml(players[voter] || "?")} → ${escapeHtml(players[target] || "?")}<br>`;
+      });
+      document.getElementById("r-voteLines").innerHTML = lines || "<span class='small'>No votes recorded.</span>";
+      document.getElementById("r-votes").classList.add("visible");
+    }, 2200));
+
+    // Step 3 — verdict + odd reveal (4000ms)
+    revealTimeouts.push(setTimeout(() => {
+      const verdict = res.caught
+        ? `<span class="win">CAUGHT! 🎉</span>`
+        : `<span class="lose">ESCAPED! 😈</span>`;
 
       const tallyLines = Object.entries(res.tally || {})
         .sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]))
@@ -663,31 +941,28 @@
       document.getElementById("p4Title").innerHTML = verdict;
       document.getElementById("p4Details").innerHTML = `
         <b>Most votes:</b> ${escapeHtml(votedOutName)}<br>
-        <b>The Odd1Owt was:</b> ${escapeHtml(oddName)}<br><br>
-        <b>Final vote tally:</b><br>${tallyLines || "<span class='small'>No votes?</span>"}<br><br>
-        <b>Questions this round:</b><br>
-        Normal: ${escapeHtml(res.normalQuestion || "")}<br>
-        Odd: ${escapeHtml(res.oddQuestion || "")}
+        <b>The Odd1Owt was:</b> ${escapeHtml(oddName)}<br>
+        <b>Their question:</b> ${escapeHtml(res.oddQuestion || "")}<br><br>
+        <b>Final vote tally:</b><br>${tallyLines || "<span class='small'>No votes?</span>"}
       `;
-    }, 1400);
+      document.getElementById("r-verdict").classList.add("visible");
+    }, 4000));
   }
 
-  function escapeHtml(str) {
-    return String(str ?? "").replace(/[&<>"']/g, m => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-    }[m]));
-  }
+  // ─── INVITE ────────────────────────────────────────────────────────────────
 
   window.copyInvite = function() {
     navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${roomId}`);
     alert("Invite link copied!");
   };
 
+  // ─── DEEP LINK ─────────────────────────────────────────────────────────────
+
   const params = new URLSearchParams(location.search);
   if (params.get("room")) {
     document.getElementById("codeInput").value = params.get("room").toUpperCase();
     show("join");
-  };
+  }
 </script>
 </body>
 </html>
